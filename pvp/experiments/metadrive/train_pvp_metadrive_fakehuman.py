@@ -26,7 +26,8 @@ if __name__ == '__main__':
     parser.add_argument("--wandb", action="store_true", help="Set to True to upload stats to wandb.")
     parser.add_argument("--wandb_project", type=str, default="", help="The project name for wandb.")
     parser.add_argument("--wandb_team", type=str, default="", help="The team name for wandb.")
-    parser.add_argument("--log_dir", type=str, default="/home/zhenghao/pvp", help="Folder to store the logs.")
+    # parser.add_argument("--log_dir", type=str, default="/home/zhenghao/pvp", help="Folder to store the logs.")
+    parser.add_argument("--log_dir", type=str, default="log", help="Folder to store the logs.")
     parser.add_argument("--free_level", type=float, default=0.95)
     parser.add_argument("--bc_loss_weight", type=float, default=0.0)
     parser.add_argument("--with_human_proxy_value_loss", default="True", type=str)
@@ -128,7 +129,8 @@ if __name__ == '__main__':
     # ===== Also build the eval env =====
     def _make_eval_env():
         eval_env_config = dict(
-            use_render=False,  # Open the interface
+            # use_render=False,  # Open the interface
+            use_render=True,
             manual_control=False,  # Allow receiving control signal from external device
             start_seed=1000,
             horizon=1500,

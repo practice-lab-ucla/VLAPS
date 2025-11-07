@@ -23,7 +23,7 @@ Compared to [PVP repo](https://metadriverse.github.io/pvp/), we include the simu
 
 ```bash
 # Clone the code to local machine
-git clone https://github.com/pengzhenghao/pvp4real
+git clone https://github.com/practice-lab-ucla/VLAPS
 cd pvp4real
 
 # Create Conda environment

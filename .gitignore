@@ -1,0 +1,6 @@
+.env
+__pycache__/
+.vscode/
+log/
+vlm_log/
+pvp.egg-info/
