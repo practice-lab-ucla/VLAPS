@@ -8,6 +8,11 @@ from metadrive.envs.safe_metadrive_env import SafeMetaDriveEnv
 from metadrive.policy.manual_control_policy import TakeoverPolicyWithoutBrake
 from metadrive.utils.math import safe_clip
 
+from pvp.utils.screenshot import Screenshotter
+
+
+
+
 ScreenMessage.SCALE = 0.1
 
 HUMAN_IN_THE_LOOP_ENV_CONFIG = {
@@ -28,9 +33,12 @@ HUMAN_IN_THE_LOOP_ENV_CONFIG = {
 
     # Visualization
     "vehicle_config": {
-        "show_dest_mark": True,  # Show the destination in a cube.
-        "show_line_to_dest": True,  # Show the line to the destination.
-        "show_line_to_navi_mark": True,  # Show the line to next navigation checkpoint.
+        # "show_dest_mark": True,  # Show the destination in a cube.
+        # "show_line_to_dest": True,  # Show the line to the destination.
+        # "show_line_to_navi_mark": True,  # Show the line to next navigation checkpoint.
+        "show_dest_mark": False,  # Show the destination in a cube.
+        "show_line_to_dest": False,  # Show the line to the destination.
+        "show_line_to_navi_mark": False,  # Show the line to next navigation checkpoint.
     },
     "horizon": 1500,
 }
@@ -51,17 +59,56 @@ class HumanInTheLoopEnv(SafeMetaDriveEnv):
     in_pause = False
     start_time = time.time()
 
+
+
     def default_config(self):
         config = super(HumanInTheLoopEnv, self).default_config()
         config.update(HUMAN_IN_THE_LOOP_ENV_CONFIG, allow_add_new_key=True)
+        # screenshot toggles
+        config.update(
+            {
+                "save_screenshots": False,
+                "screenshot_interval": 3.0,
+                "screenshot_dir": "ima_log",
+                "screenshot_prefix": "shot",
+            },
+            allow_add_new_key=True,
+        )
         return config
+
+
 
     def reset(self, *args, **kwargs):
         self.takeover = False
         self.agent_action = None
         obs, info = super(HumanInTheLoopEnv, self).reset(*args, **kwargs)
-        # The training code is for older version of gym, so we discard the additional info from the reset.
+        # init screenshotter
+        self._screenshotter = None
+        if self.config.get("save_screenshots") and self.config.get("use_render"):
+            self._screenshotter = Screenshotter(
+                directory=self.config.get("screenshot_dir", "ima_log"),
+                interval=self.config.get("screenshot_interval", 3.0),
+                prefix=self.config.get("screenshot_prefix", "shot"),
+            )
+        # this env returns obs only (older gym style)
         return obs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def _get_step_return(self, actions, engine_info):
         """Compute takeover cost here."""
@@ -97,6 +144,22 @@ class HumanInTheLoopEnv(SafeMetaDriveEnv):
 
     def step(self, actions):
         """Add additional information to the interface."""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         self.agent_action = copy.copy(actions)
         ret = super(HumanInTheLoopEnv, self).step(actions)
         while self.in_pause:
@@ -115,6 +178,8 @@ class HumanInTheLoopEnv(SafeMetaDriveEnv):
                     "Pause": "Press E",
                 }
             )
+            if getattr(self, "_screenshotter", None) is not None:
+                self._screenshotter.maybe(self.engine)
 
         self.total_steps += 1
 
@@ -131,6 +196,7 @@ class HumanInTheLoopEnv(SafeMetaDriveEnv):
         """Introduce additional key 'e' to the interface."""
         super(HumanInTheLoopEnv, self).setup_engine()
         self.engine.accept("e", self.stop)
+        
 
     def get_takeover_cost(self, info):
         """Return the takeover cost when intervened."""

@@ -25,6 +25,8 @@ def get_expert():
 
     # Initialize agent
     algo_config = dict(
+
+        
         policy=ActorCriticPolicy,
         n_steps=1024,  # n_steps * n_envs = total_batch_size
         n_epochs=20,
@@ -196,6 +198,8 @@ class FakeHumanEnv(HumanInTheLoopEnv):
                     "Pause": "Press E",
                 }
             )
+            if getattr(self, "_screenshotter", None) is not None:
+                self._screenshotter.maybe(self.engine)
 
         assert i["takeover"] == self.takeover
 

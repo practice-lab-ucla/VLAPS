@@ -1,0 +1,87 @@
+[38;20m[INFO] Environment: HumanInTheLoopEnv[0m
+[38;20m[INFO] MetaDrive version: 0.4.3[0m
+[38;20m[INFO] Sensors: [lidar: Lidar(), side_detector: SideDetector(), lane_line_detector: LaneLineDetector()][0m
+[38;20m[INFO] Render Mode: none[0m
+[38;20m[INFO] Horizon (Max steps per agent): 1500[0m
+[38;20m[INFO] Assets version: 0.4.3[0m
+[38;20m[INFO] Known Pipes: glxGraphicsPipe[0m
+[38;20m[INFO] Start Scenario Index: 100, Num Scenarios : 50[0m
+INFO:/mnt/data0/qizhao/project2/pvp4real/pvp/sb3/common/monitor.py:In Monitor, we auto detect the record keys: ('overtake_vehicle_num', 'velocity', 'steering', 'acceleration', 'step_energy', 'episode_energy', 'policy', 'navigation_command', 'navigation_forward', 'navigation_left', 'navigation_right', 'action', 'raw_action', 'crash_vehicle', 'crash_object', 'crash_building', 'crash_human', 'crash_sidewalk', 'out_of_road', 'arrive_dest', 'max_step', 'env_seed', 'crash', 'step_reward', 'route_completion', 'cost', 'total_cost', 'episode_reward', 'episode_length', 'takeover_start', 'takeover', 'takeover_cost', 'total_takeover_cost', 'native_cost', 'episode_native_cost', 'total_takeover_count', 'ep_overtake_vehicle_num', 'ep_velocity', 'ep_steering', 'ep_acceleration', 'ep_step_energy', 'ep_episode_energy', 'ep_policy', 'ep_navigation_command', 'ep_navigation_forward', 'ep_navigation_left', 'ep_navigation_right', 'ep_action', 'ep_raw_action', 'ep_crash_vehicle', 'ep_crash_object', 'ep_crash_building', 'ep_crash_human', 'ep_crash_sidewalk', 'ep_out_of_road', 'ep_arrive_dest', 'ep_max_step', 'ep_env_seed', 'ep_crash', 'ep_step_reward', 'ep_route_completion', 'ep_cost', 'ep_total_cost', 'ep_episode_reward', 'ep_episode_length', 'ep_takeover_start', 'ep_takeover', 'ep_takeover_cost', 'ep_total_takeover_cost', 'ep_native_cost', 'ep_episode_native_cost', 'ep_total_takeover_count')
+pygame 2.6.1 (SDL 2.28.4, Python 3.7.12)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+Using cuda device
+Wrapping the env with a `Monitor` wrapper
+Wrapping the env in a DummyVecEnv.
+Loading checkpoint from /mnt/data0/qizhao/project2/pvp4real/pvp/experiments/metadrive/egpo/metadrive_pvp_20m_steps!
+Model is loaded from /mnt/data0/qizhao/project2/pvp4real/pvp/experiments/metadrive/egpo/metadrive_pvp_20m_steps!
+Trial name is set to:  _freelevel0.95_2025-11-17_13-55-36_d4734dd7
+We start logging training data into log/runs/_freelevel0.95/_freelevel0.95_2025-11-17_13-55-36_d4734dd7
+[38;20m[INFO] Environment: HumanInTheLoopEnv[0m
+[38;20m[INFO] MetaDrive version: 0.4.3[0m
+[38;20m[INFO] Sensors: [lidar: Lidar(), side_detector: SideDetector(), lane_line_detector: LaneLineDetector()][0m
+[38;20m[INFO] Render Mode: none[0m
+[38;20m[INFO] Horizon (Max steps per agent): 1500[0m
+[38;20m[INFO] Assets version: 0.4.3[0m
+[38;20m[INFO] Known Pipes: glxGraphicsPipe[0m
+[38;20m[INFO] Start Scenario Index: 100, Num Scenarios : 50[0m
+INFO:/mnt/data0/qizhao/project2/pvp4real/pvp/sb3/common/monitor.py:In Monitor, we auto detect the record keys: ('overtake_vehicle_num', 'velocity', 'steering', 'acceleration', 'step_energy', 'episode_energy', 'policy', 'navigation_command', 'navigation_forward', 'navigation_left', 'navigation_right', 'action', 'raw_action', 'crash_vehicle', 'crash_object', 'crash_building', 'crash_human', 'crash_sidewalk', 'out_of_road', 'arrive_dest', 'max_step', 'env_seed', 'crash', 'step_reward', 'route_completion', 'cost', 'total_cost', 'episode_reward', 'episode_length', 'takeover_start', 'takeover', 'takeover_cost', 'total_takeover_cost', 'native_cost', 'episode_native_cost', 'total_takeover_count', 'ep_overtake_vehicle_num', 'ep_velocity', 'ep_steering', 'ep_acceleration', 'ep_step_energy', 'ep_episode_energy', 'ep_policy', 'ep_navigation_command', 'ep_navigation_forward', 'ep_navigation_left', 'ep_navigation_right', 'ep_action', 'ep_raw_action', 'ep_crash_vehicle', 'ep_crash_object', 'ep_crash_building', 'ep_crash_human', 'ep_crash_sidewalk', 'ep_out_of_road', 'ep_arrive_dest', 'ep_max_step', 'ep_env_seed', 'ep_crash', 'ep_step_reward', 'ep_route_completion', 'ep_cost', 'ep_total_cost', 'ep_episode_reward', 'ep_episode_length', 'ep_takeover_start', 'ep_takeover', 'ep_takeover_cost', 'ep_total_takeover_cost', 'ep_native_cost', 'ep_episode_native_cost', 'ep_total_takeover_count')
+[38;20m[INFO] Environment: HumanInTheLoopEnv[0m
+[38;20m[INFO] MetaDrive version: 0.4.3[0m
+[38;20m[INFO] Sensors: [lidar: Lidar(), side_detector: SideDetector(), lane_line_detector: LaneLineDetector()][0m
+[38;20m[INFO] Render Mode: none[0m
+[38;20m[INFO] Horizon (Max steps per agent): 1500[0m
+[38;20m[INFO] Assets version: 0.4.3[0m
+[38;20m[INFO] Known Pipes: glxGraphicsPipe[0m
+[38;20m[INFO] Start Scenario Index: 1000, Num Scenarios : 50[0m
+INFO:/mnt/data0/qizhao/project2/pvp4real/pvp/sb3/common/monitor.py:In Monitor, we auto detect the record keys: ('overtake_vehicle_num', 'velocity', 'steering', 'acceleration', 'step_energy', 'episode_energy', 'policy', 'navigation_command', 'navigation_forward', 'navigation_left', 'navigation_right', 'action', 'raw_action', 'crash_vehicle', 'crash_object', 'crash_building', 'crash_human', 'crash_sidewalk', 'out_of_road', 'arrive_dest', 'max_step', 'env_seed', 'crash', 'step_reward', 'route_completion', 'cost', 'total_cost', 'episode_reward', 'episode_length', 'takeover_start', 'takeover', 'takeover_cost', 'total_takeover_cost', 'native_cost', 'episode_native_cost', 'total_takeover_count', 'ep_overtake_vehicle_num', 'ep_velocity', 'ep_steering', 'ep_acceleration', 'ep_step_energy', 'ep_episode_energy', 'ep_policy', 'ep_navigation_command', 'ep_navigation_forward', 'ep_navigation_left', 'ep_navigation_right', 'ep_action', 'ep_raw_action', 'ep_crash_vehicle', 'ep_crash_object', 'ep_crash_building', 'ep_crash_human', 'ep_crash_sidewalk', 'ep_out_of_road', 'ep_arrive_dest', 'ep_max_step', 'ep_env_seed', 'ep_crash', 'ep_step_reward', 'ep_route_completion', 'ep_cost', 'ep_total_cost', 'ep_episode_reward', 'ep_episode_length', 'ep_takeover_start', 'ep_takeover', 'ep_takeover_cost', 'ep_total_takeover_cost', 'ep_native_cost', 'ep_episode_native_cost', 'ep_total_takeover_count')
+[38;20m[INFO] Environment: FakeHumanEnv[0m
+[38;20m[INFO] MetaDrive version: 0.4.3[0m
+[38;20m[INFO] Sensors: [lidar: Lidar(), side_detector: SideDetector(), lane_line_detector: LaneLineDetector(), main_camera: MainCamera(1200, 900), dashboard: DashBoard()][0m
+[38;20m[INFO] Render Mode: onscreen[0m
+[38;20m[INFO] Horizon (Max steps per agent): 1500[0m
+[38;20m[INFO] Assets version: 0.4.3[0m
+[38;20m[INFO] Known Pipes: glxGraphicsPipe[0m
+Using cuda device
+Wrapping the env with a `Monitor` wrapper
+Wrapping the env in a DummyVecEnv.
+Loading checkpoint from /mnt/data0/qizhao/project2/pvp4real/pvp/experiments/metadrive/egpo/metadrive_pvp_20m_steps!
+Model is loaded from /mnt/data0/qizhao/project2/pvp4real/pvp/experiments/metadrive/egpo/metadrive_pvp_20m_steps!
+Process ForkServerProcess-1:
+Traceback (most recent call last):
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/multiprocessing/process.py", line 297, in _bootstrap
+    self.run()
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/multiprocessing/process.py", line 99, in run
+    self._target(*self._args, **self._kwargs)
+  File "/mnt/data0/qizhao/project2/pvp4real/pvp/sb3/common/vec_env/subproc_vec_env.py", line 27, in _worker
+    cmd, data = remote.recv()
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/multiprocessing/connection.py", line 250, in recv
+    buf = self._recv_bytes()
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/multiprocessing/connection.py", line 407, in _recv_bytes
+    buf = self._recv(4)
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/multiprocessing/connection.py", line 379, in _recv
+    chunk = read(handle, remaining)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "pvp/experiments/metadrive/train_pvp_metadrive_fakehuman.py", line 246, in <module>
+    train_env = Monitor(env=train_env, filename=str(trial_dir))
+  File "/mnt/data0/qizhao/project2/pvp4real/pvp/sb3/common/monitor.py", line 46, in __init__
+    self.env.reset()
+  File "/mnt/data0/qizhao/project2/pvp4real/pvp/experiments/metadrive/human_in_the_loop_env.py", line 65, in reset
+    obs, info = super(HumanInTheLoopEnv, self).reset(*args, **kwargs)
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/envs/safe_metadrive_env.py", line 30, in reset
+    return super(SafeMetaDriveEnv, self).reset(*args, **kwargs)
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/envs/base_env.py", line 523, in reset
+    self.lazy_init()  # it only works the first time when reset() is called to avoid the error when render
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/envs/base_env.py", line 415, in lazy_init
+    initialize_engine(self.config)
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/engine/engine_utils.py", line 38, in initialize_engine
+    cls.singleton = cls(env_global_config)
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/engine/base_engine.py", line 58, in __init__
+    EngineCore.__init__(self, global_config)
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/engine/core/engine_core.py", line 320, in __init__
+    self.sky_box = SkyBox(not self.global_config["show_skybox"])
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/metadrive/engine/core/sky_box.py", line 27, in __init__
+    skybox_texture = self.loader.loadTexture(AssetLoader.file_path("textures", "skybox.jpg"))
+  File "/home/qizhao/miniconda3/envs/pvp4real/lib/python3.7/site-packages/direct/showbase/Loader.py", line 760, in loadTexture
+    texture = TexturePool.loadTexture(texturePath, 0, readMipmaps, loaderOptions)
+KeyboardInterrupt
