@@ -1,7 +1,7 @@
 # run_vlm.py
 import base64, mimetypes, json, re, os, datetime
 from pathlib import Path
-from vlm_config import MODEL, DEFAULT_PROMPT, make_client
+from .vlm_config import MODEL, DEFAULT_PROMPT, make_client
 from typing import Optional
 
 def run_vlm(image_path: str, prompt: Optional[str] = None) -> int:

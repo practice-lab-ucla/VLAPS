@@ -99,17 +99,6 @@ class HumanInTheLoopEnv(SafeMetaDriveEnv):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
     def _get_step_return(self, actions, engine_info):
         """Compute takeover cost here."""
         o, r, tm, tc, engine_info = super(HumanInTheLoopEnv, self)._get_step_return(actions, engine_info)
@@ -144,14 +133,6 @@ class HumanInTheLoopEnv(SafeMetaDriveEnv):
 
     def step(self, actions):
         """Add additional information to the interface."""
-
-
-
-
-
-
-
-
 
 
 

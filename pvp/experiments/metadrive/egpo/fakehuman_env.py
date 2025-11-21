@@ -11,6 +11,11 @@ from metadrive.policy.env_input_policy import EnvInputPolicy
 
 from pvp.experiments.metadrive.human_in_the_loop_env import HumanInTheLoopEnv
 
+from VLM import run_vlm
+
+import time   
+
+
 FOLDER_PATH = pathlib.Path(__file__).parent
 
 logger = get_logger()
@@ -88,6 +93,12 @@ class FakeHumanEnv(HumanInTheLoopEnv):
 
     def __init__(self, config):
         super(FakeHumanEnv, self).__init__(config)
+
+        
+        self._vlm_pending = False
+        self._vlm_wait_until = 0.0
+
+
         if self.config["use_discrete"]:
             self._num_bins = 13
             self._grid = np.linspace(-1, 1, self._num_bins)
@@ -119,7 +130,14 @@ class FakeHumanEnv(HumanInTheLoopEnv):
                 "manual_control": False,
                 "use_render": False,
                 "expert_deterministic": False,
-            }
+
+                # add these defaults so training can override safely
+                "save_screenshots": False,
+                "vlm_wait_time": 3.0,
+                "screenshot_dir": "ima_log",
+                "screenshot_prefix": "shot",
+            },
+            allow_add_new_key=True,   # <— important
         )
         return config
 
@@ -186,20 +204,129 @@ class FakeHumanEnv(HumanInTheLoopEnv):
         if not self.config["disable_expert"]:
             i["takeover_log_prob"] = log_prob.item()
 
-        if self.config["use_render"]:  # and self.config["main_exp"]: #and not self.config["in_replay"]:
-            super(HumanInTheLoopEnv, self).render(
-                text={
-                    "Total Cost": round(self.total_cost, 2),
-                    "Takeover Cost": round(self.total_takeover_cost, 2),
-                    "Takeover": "TAKEOVER" if self.takeover else "NO",
-                    "Total Step": self.total_steps,
-                    # "Total Time": time.strftime("%M:%S", time.gmtime(time.time() - self.start_time)),
-                    "Takeover Rate": "{:.2f}%".format(np.mean(np.array(self.takeover_recorder) * 100)),
-                    "Pause": "Press E",
-                }
-            )
-            if getattr(self, "_screenshotter", None) is not None:
-                self._screenshotter.maybe(self.engine)
+
+
+
+
+
+
+
+
+
+        # ----- Screenshot + VLM control (training-only) -----
+        # Behavior:
+        # 1) When not already waiting for the post-VLM period, manually capture a screenshot,
+        #    then BLOCK the step until run_vlm() returns (this prevents the simulator from progressing
+        #    while the VLM runs).
+        # 2) After VLM returns, start a non-blocking timer (vlm_wait_time). While that timer
+        #    is running the env behaves normally. When the timer expires we take the follow-up screenshot.
+        if getattr(self, "_screenshotter", None) is not None:
+            from pathlib import Path
+
+            screenshot_dir = Path(self.config.get("screenshot_dir", "ima_log"))
+            prefix = self.config.get("screenshot_prefix", "shot")
+            vlm_wait = float(self.config.get("vlm_wait_time", self.config.get("screenshot_interval", 3.0)))
+
+            # If we're in the post-VLM run period, check timer and capture when elapsed.
+            if getattr(self, "_vlm_pending", False):
+                if time.time() >= getattr(self, "_vlm_wait_until", 0.0):
+                    # do the follow-up capture now and clear pending flag
+                    try:
+                        if hasattr(self._screenshotter, "capture"):
+                            try:
+                                self._screenshotter.capture(self.engine)
+                            except TypeError:
+                                self._screenshotter.capture()
+                        else:
+                            # fallback: force one maybe() call
+                            self._screenshotter.maybe(self.engine)
+                        print("[VLM] post-VLM follow-up screenshot captured.")
+                    except Exception as e:
+                        print(f"[Screenshotter] follow-up capture failed: {e}")
+                    self._vlm_pending = False
+                # else: still waiting; do nothing and allow simulator to continue running
+
+            else:
+                # Idle: trigger manual capture -> BLOCK until VLM responds -> schedule follow-up capture
+                try:
+                    # MANUAL initial capture (do not use periodic maybe())
+                    if hasattr(self._screenshotter, "capture"):
+                        try:
+                            self._screenshotter.capture(self.engine)
+                        except TypeError:
+                            self._screenshotter.capture()
+                    else:
+                        # one-shot fallback
+                        self._screenshotter.maybe(self.engine)
+                except Exception as e:
+                    print(f"[Screenshotter] initial capture failed: {e}")
+
+                # find the latest screenshot file to send to VLM
+                latest = None
+                try:
+                    if screenshot_dir.exists():
+                        files = sorted(screenshot_dir.glob(f"{prefix}*"), key=lambda p: p.stat().st_mtime)
+                    else:
+                        files = []
+                    if files:
+                        latest = files[-1]
+                    else:
+                        print("[VLM] No screenshot files found to run VLM on.")
+                except Exception as e:
+                    print(f"[VLM integration] error while locating screenshot: {e}")
+
+                # BLOCK the simulator here until the VLM returns by calling run_vlm synchronously.
+                # This ensures the simulator does not progress during VLM inference.
+                if latest is not None:
+                    try:
+                        vlm_result = run_vlm.run_vlm(str(latest))
+                        print(f"[VLM] result for {latest.name}: {vlm_result}")
+                    except Exception as e:
+                        print(f"[VLM] error calling run_vlm on {latest}: {e}")
+                else:
+                    # No screenshot; skip VLM but still start the post-VLM wait to avoid spamming.
+                    print("[VLM] skipped (no screenshot).")
+
+                # Start the non-blocking post-VLM timer, let simulator continue running until it elapses.
+                try:
+                    self._vlm_pending = True
+                    self._vlm_wait_until = time.time() + vlm_wait
+                    # do NOT time.sleep() here — letting the environment step normally while we wait.
+                    # The follow-up capture will occur in future step() calls when the timer elapses.
+                except Exception as e:
+                    print(f"[VLM integration] failed to start post-VLM timer: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         assert i["takeover"] == self.takeover
 

@@ -136,7 +136,7 @@ if __name__ == '__main__':
             # FakeHumanEnv config:
             free_level=free_level,
             save_screenshots=True,
-            screenshot_interval=3.0,
+            vlm_wait_time=3.0,
             screenshot_dir="ima_log",
             screenshot_prefix="shot",
 
@@ -270,6 +270,12 @@ if __name__ == '__main__':
         total_timesteps=50_000,
         callback=callbacks,
         reset_num_timesteps=True,
+
+
+        # eval_env=eval_env,
+        # eval_freq=150,
+        # n_eval_episodes=50,
+        # eval_log_path=str(trial_dir),
 
         # logging
         tb_log_name=experiment_batch_name,
