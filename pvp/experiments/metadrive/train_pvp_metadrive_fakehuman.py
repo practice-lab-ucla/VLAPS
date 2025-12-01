@@ -2,6 +2,7 @@
 import argparse
 import os
 import uuid
+import ipdb
 from pathlib import Path
 
 from pvp.experiments.metadrive.egpo.fakehuman_env import FakeHumanEnv
@@ -16,6 +17,9 @@ from pvp.utils.shared_control_monitor import SharedControlMonitor
 from pvp.utils.utils import get_time_str
 from pvp.utils.waypoint_viz import drop_waypoint_markers, clear_waypoint_markers
 
+from pvp.sb3.common.callbacks import BaseCallback
+
+
 from panda3d.core import (
     TextNode,
     LineSegs,
@@ -27,6 +31,31 @@ from panda3d.core import (
 
 # If your local copy needs DummyVecEnv anywhere, import it. (Some variants of this file did.)
 # from pvp.sb3.common.vec_env import DummyVecEnv
+
+
+class WaypointCallback(BaseCallback):
+    def _on_step(self) -> bool:
+        # unwrap vec env / monitor if necessary
+        # training_env is usually a VecEnv; here we assume single env
+        env = self.training_env.envs[0]
+        # unwrap Monitor
+        if hasattr(env, "env"):
+            env = env.env
+
+        # current position
+        start_pos = env.agent.position
+        z0 = float(start_pos[2]) if len(start_pos) >= 3 else 0.0
+
+        # Try to use the single RRT target (global)
+        target = getattr(env, "last_rrt_target_global", None)
+        if target is not None:
+            xg, yg = target
+            manual_waypoints = [(float(xg), float(yg), z0)]
+
+        clear_waypoint_markers(env)
+        drop_waypoint_markers(env, manual_waypoints, color=(1.0, 0.0, 0.0, 1.0))
+
+        return True
 
 
 def clear_waypoint_markers(env):
@@ -204,6 +233,8 @@ if __name__ == '__main__':
     # ===== Setup the training environment =====
     train_env = FakeHumanEnv(config=config["env_config"])
     train_env = Monitor(env=train_env, filename=str(trial_dir))
+    # print("1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111")
+    # print(train_env.agent.position)
 
     # ===== Drop debug waypoints =====
     train_env.reset()  # make sure the environment has started
@@ -228,6 +259,22 @@ if __name__ == '__main__':
         (40.0, 0.0, 0.0),      # back toward center line
     ]
 
+    start_pos = train_env.agent.position
+    print("Agent position (after reset):", start_pos)
+
+    # x0 = float(start_pos[0])  # x
+    # y0 = float(start_pos[1])  # y
+    # z0 = float(start_pos[2]) if len(start_pos) >= 3 else 0.0  # z if available, else 0
+    # manual_waypoints = [
+    #     (x0,        y0,        0.0),  # exactly at current agent position
+    #     (x0 + 10.0, y0,        0.0),  # 10 m forward in x from current position
+    #     (x0 + 20.0, y0 + 5.0,  0.0),  # a little right
+    #     (x0 + 30.0, y0 + 5.0,  0.0),  # 10m more forward
+    #     (x0 + 40.0, y0,        0.0),  # back toward center line
+    # ]
+
+    
+
     # Drop your markers (choose any RGBA you like)
     # drop_waypoint_markers(train_env, manual_waypoints, color=(0.0, 0.0, 1.0, 1.0))
     drop_waypoint_markers(train_env, manual_waypoints, color=(1.0, 0.0, 0.0, 1.0))
@@ -240,8 +287,10 @@ if __name__ == '__main__':
     # ===== Setup the callbacks =====
     save_freq = args.save_freq
     callbacks = [
-        CheckpointCallback(name_prefix="rl_model", verbose=2, save_freq=save_freq, save_path=str(trial_dir / "models"))
-    ]
+        CheckpointCallback(name_prefix="rl_model", verbose=2, save_freq=save_freq, save_path=str(trial_dir / "models")),
+        WaypointCallback()
+    ]   
+
     if use_wandb:
         callbacks.append(
             WandbCallback(

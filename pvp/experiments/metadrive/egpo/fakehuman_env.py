@@ -1,109 +1,47 @@
 import copy
 import math
 import pathlib
-
+import time
+import ipdb
 import gymnasium as gym
 import numpy as np
-import torch
 from metadrive.engine.logger import get_logger
-from metadrive.examples.ppo_expert.numpy_expert import ckpt_path
 from metadrive.policy.env_input_policy import EnvInputPolicy
 
 from pvp.experiments.metadrive.human_in_the_loop_env import HumanInTheLoopEnv
-
 from VLM import run_vlm
 
-import time   
-
+from .expert import LinearizedKinematicMPC, MPCConfig  # <-- MPC expert
 
 FOLDER_PATH = pathlib.Path(__file__).parent
-
 logger = get_logger()
-
-
-def get_expert():
-    from pvp.sb3.common.save_util import load_from_zip_file
-    from pvp.sb3.ppo import PPO
-    from pvp.sb3.ppo.policies import ActorCriticPolicy
-
-    train_env = HumanInTheLoopEnv(config={'manual_control': False, "use_render": False})
-
-    # Initialize agent
-    algo_config = dict(
-
-        
-        policy=ActorCriticPolicy,
-        n_steps=1024,  # n_steps * n_envs = total_batch_size
-        n_epochs=20,
-        learning_rate=5e-5,
-        batch_size=256,
-        clip_range=0.1,
-        vf_coef=0.5,
-        ent_coef=0.0,
-        max_grad_norm=10.0,
-        # tensorboard_log=trial_dir,
-        create_eval_env=False,
-        verbose=2,
-        # seed=seed,
-        device="auto",
-        env=train_env
-    )
-    model = PPO(**algo_config)
-
-    ckpt = FOLDER_PATH / "metadrive_pvp_20m_steps"
-
-    print(f"Loading checkpoint from {ckpt}!")
-    data, params, pytorch_variables = load_from_zip_file(ckpt, device=model.device, print_system_info=False)
-    model.set_parameters(params, exact_match=True, device=model.device)
-    print(f"Model is loaded from {ckpt}!")
-
-    train_env.close()
-
-    return model.policy
-
-
-def obs_correction(obs):
-    # due to coordinate correction, this observation should be reversed
-    obs[15] = 1 - obs[15]
-    obs[10] = 1 - obs[10]
-    return obs
-
-
-def normpdf(x, mean, sd):
-    var = float(sd)**2
-    denom = (2 * math.pi * var)**.5
-    num = math.exp(-(float(x) - float(mean))**2 / (2 * var))
-    return num / denom
-
-
-def load():
-    global _expert_weights
-    if _expert_weights is None:
-        _expert_weights = np.load(ckpt_path)
-    return _expert_weights
-
-
-_expert = get_expert()
 
 
 class FakeHumanEnv(HumanInTheLoopEnv):
     last_takeover = None
     last_obs = None
-    expert = None
 
     def __init__(self, config):
         super(FakeHumanEnv, self).__init__(config)
 
-        
+        # --- MPC expert instance ---
+        # One MPC per env; uses warm-start internally across steps.
+        self.mpc = LinearizedKinematicMPC(MPCConfig())
+        self.last_rrt_target_global = None
+
+        # VLM-related state
         self._vlm_pending = False
         self._vlm_wait_until = 0.0
 
-
+        # Discrete wrapper
         if self.config["use_discrete"]:
             self._num_bins = 13
             self._grid = np.linspace(-1, 1, self._num_bins)
             self._actions = np.array(np.meshgrid(self._grid, self._grid)).T.reshape(-1, 2)
 
+    # ------------------------------------------------------------------ #
+    # Action space
+    # ------------------------------------------------------------------ #
     @property
     def action_space(self) -> gym.Space:
         if self.config["use_discrete"]:
@@ -111,15 +49,8 @@ class FakeHumanEnv(HumanInTheLoopEnv):
         else:
             return super(FakeHumanEnv, self).action_space
 
-    # def _preprocess_actions(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray], int]) -> Union[np.ndarray, Dict[AnyStr, np.ndarray], int]:
-    #     if self.config["use_discrete"]:
-    #         print(111)
-    #         return int(actions)
-    #     else:
-    #         return actions
-
     def default_config(self):
-        """Revert to use the RL policy (so no takeover signal will be issued from the human)"""
+        """Use RL policy as 'agent', MPC (or VLM-assisted) as expert."""
         config = super(FakeHumanEnv, self).default_config()
         config.update(
             {
@@ -129,18 +60,21 @@ class FakeHumanEnv(HumanInTheLoopEnv):
                 "free_level": 0.95,
                 "manual_control": False,
                 "use_render": False,
-                "expert_deterministic": False,
+                "expert_deterministic": True,  # kept for compatibility
 
-                # add these defaults so training can override safely
+                # VLM/screenshot defaults
                 "save_screenshots": False,
                 "vlm_wait_time": 3.0,
                 "screenshot_dir": "ima_log",
                 "screenshot_prefix": "shot",
             },
-            allow_add_new_key=True,   # <— important
+            allow_add_new_key=True,
         )
         return config
 
+    # ------------------------------------------------------------------ #
+    # Discrete ↔ continuous helpers
+    # ------------------------------------------------------------------ #
     def continuous_to_discrete(self, a):
         distances = np.linalg.norm(self._actions - a, axis=1)
         discrete_index = np.argmin(distances)
@@ -150,76 +84,158 @@ class FakeHumanEnv(HumanInTheLoopEnv):
         continuous_action = self._actions[a.astype(int)]
         return continuous_action
 
+    # ------------------------------------------------------------------ #
+    # Main step: AGENT + MPC expert + gate + VLM
+    # ------------------------------------------------------------------ #
+
+
+
+    def predict_bicycle_step(self, veh, action):
+        """
+        One-step kinematic bicycle prediction (no env stepping).
+        action: [steer_norm, pedal_norm] in [-1, 1]^2
+        Returns: (x_next, y_next), v_next, yaw_next in global frame
+        """
+        cfg = self.mpc.cfg
+        dt = 3
+        L = float(cfg.L)
+
+        pos = np.array(veh.position, dtype=np.float64)
+        heading_vec = np.array(veh.heading, dtype=np.float64)
+        yaw = float(np.arctan2(heading_vec[1], heading_vec[0]))
+        v = float(veh.speed)
+
+        steer_norm, pedal_norm = float(action[0]), float(action[1])
+
+        max_steer_rad = np.deg2rad(30.0)
+        max_accel = 3.0
+
+        delta = steer_norm * max_steer_rad
+        a = pedal_norm * max_accel
+
+        # Integrate speed and heading
+        v_next = v + a * dt
+        yaw_rate = v * np.tan(delta) / L
+        yaw_next = yaw + yaw_rate * dt
+
+        # Use the *updated* state (or a midpoint) to update position
+        x_next = pos[0] + v_next * np.cos(yaw_next) * dt
+        y_next = pos[1] + v_next * np.sin(yaw_next) * dt
+
+        return np.array([x_next, y_next]), v_next, yaw_next
+    
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     def step(self, actions):
-        """Compared to the original one, we call expert_action_prob here and implement a takeover function."""
+        """
+        Same structure as your PPO/VLM env, but expert is now MPC:
+        - Agent proposes actions (TD3 / RL).
+        - MPC computes expert action from vehicle state.
+        - Distance-based gate decides takeover.
+        - VLM + screenshot logic kept as-is.
+        """
         actions = np.asarray(actions).astype(np.float32)
 
         if self.config["use_discrete"]:
             actions = self.discrete_to_continuous(actions)
 
+        # Store agent proposal
         self.agent_action = copy.copy(actions)
         self.last_takeover = self.takeover
 
-        # ===== Get expert action and determine whether to take over! =====
+        takeover_log_prob = None  # PVP logger expects something here
 
-        if self.config["disable_expert"]:
-            pass
+        # ===== Expert takeover via MPC =====
+        if not self.config["disable_expert"]:
+            # Compute expert action from underlying MetaDrive vehicle state.
+            # self.agent is the MetaDrive vehicle created by the base env.
+            expert_action = self.mpc.action(self.agent, self.last_obs)  # [-1, 1]^2
 
-        else:
-            if self.expert is None:
-                global _expert
-                self.expert = _expert
-            last_obs, _ = self.expert.obs_to_tensor(self.last_obs)
-            distribution = self.expert.get_distribution(last_obs)
-            log_prob = distribution.log_prob(torch.from_numpy(actions).to(last_obs.device))
-            action_prob = log_prob.exp().detach().cpu().numpy()
+            print(
+            "AGENT (policy) action:", self.agent_action,
+            " | EXPERT (MPC) action:", expert_action,
+            )
 
-            if self.config["expert_deterministic"]:
-                expert_action = distribution.mode().detach().cpu().numpy()
-            else:
-                expert_action = distribution.sample().detach().cpu().numpy()
 
-            assert expert_action.shape[0] == action_prob.shape[0] == 1
-            action_prob = action_prob[0]
-            expert_action = expert_action[0]
-            if action_prob < 1 - self.config['free_level']:
+            # Predict where we would go with EACH policy from the same current state:
+            print("111111111111111111111111111111111111111111111111111111111111111111111111111111111111111")
+            agent_pos_next, agent_v_next, agent_yaw_next = self.predict_bicycle_step(
+                self.agent, self.agent_action
+            )
+            expert_pos_next, expert_v_next, expert_yaw_next = self.predict_bicycle_step(
+                self.agent, expert_action
+            )
 
-                # print(f"Action probability: {action_prob}, agent action: {actions}, expert action: {expert_action},")
 
+            print("AGENT predicted next global pos:", agent_pos_next)
+            print("EXPERT predicted next global pos:", expert_pos_next)
+
+
+
+
+
+
+
+
+
+
+
+
+
+            self.last_rrt_target_global = getattr(self.mpc, "_last_target_global", None)
+
+            # Distance-based "probability-like" score (same as MPC env)
+            diff = np.linalg.norm(actions - expert_action)
+            max_diff = np.sqrt(8.0)  # max distance in [-1,1]^2
+            diff_norm = np.clip(diff / max_diff, 0.0, 1.0)
+            action_prob = 1.0 - diff_norm  # 1 if identical, ~0 if opposite
+
+            # If actions disagree enough, let MPC take over
+            # If you want the free_level semantics, uncomment the condition below
+            # if action_prob < 1.0 - self.config["free_level"]:
+            if True:
                 if self.config["use_discrete"]:
-                    expert_action = self.continuous_to_discrete(expert_action)
-                    expert_action = self.discrete_to_continuous(expert_action)
+                    expert_action_disc = self.continuous_to_discrete(expert_action)
+                    expert_action = self.discrete_to_continuous(expert_action_disc)
 
                 actions = expert_action
-
                 self.takeover = True
             else:
                 self.takeover = False
-            # print(f"Action probability: {action_prob:.3f}, agent action: {actions}, expert action: {expert_action}, takeover: {self.takeover}")
 
+            takeover_log_prob = float(action_prob)  # log-prob substitute for logging
+
+        # ===== Step the underlying HumanInTheLoopEnv =====
         o, r, d, i = super(HumanInTheLoopEnv, self).step(actions)
         self.takeover_recorder.append(self.takeover)
         self.total_steps += 1
 
-        if not self.config["disable_expert"]:
-            i["takeover_log_prob"] = log_prob.item()
+        # Extra logging expected by SharedControlMonitor / Monitor
+        if not self.config["disable_expert"] and takeover_log_prob is not None:
+            i["takeover_log_prob"] = takeover_log_prob
 
-
-
-
-
-
-
-
-
-
-        # ----- Screenshot + VLM control (training-only) -----
-        # Behavior:
-        # 1) When not already waiting for the post-VLM period, manually capture a screenshot,
-        #    then BLOCK the step until run_vlm() returns (this prevents the simulator from progressing
-        #    while the VLM runs).
-        # 2) After VLM returns, start a non-blocking timer (vlm_wait_time). While that timer
-        #    is running the env behaves normally. When the timer expires we take the follow-up screenshot.
+        # ------------------------------------------------------------------ #
+        # Screenshot + VLM control (unchanged)
+        # ------------------------------------------------------------------ #
         if getattr(self, "_screenshotter", None) is not None:
             from pathlib import Path
 
@@ -275,8 +291,7 @@ class FakeHumanEnv(HumanInTheLoopEnv):
                 except Exception as e:
                     print(f"[VLM integration] error while locating screenshot: {e}")
 
-                # BLOCK the simulator here until the VLM returns by calling run_vlm synchronously.
-                # This ensures the simulator does not progress during VLM inference.
+                # BLOCK here until VLM returns
                 if latest is not None:
                     try:
                         vlm_result = run_vlm.run_vlm(str(latest))
@@ -284,50 +299,16 @@ class FakeHumanEnv(HumanInTheLoopEnv):
                     except Exception as e:
                         print(f"[VLM] error calling run_vlm on {latest}: {e}")
                 else:
-                    # No screenshot; skip VLM but still start the post-VLM wait to avoid spamming.
                     print("[VLM] skipped (no screenshot).")
 
-                # Start the non-blocking post-VLM timer, let simulator continue running until it elapses.
+                # Start non-blocking post-VLM timer
                 try:
                     self._vlm_pending = True
                     self._vlm_wait_until = time.time() + vlm_wait
-                    # do NOT time.sleep() here — letting the environment step normally while we wait.
-                    # The follow-up capture will occur in future step() calls when the timer elapses.
                 except Exception as e:
                     print(f"[VLM integration] failed to start post-VLM timer: {e}")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        # Sanity: takeover flag from here and from HumanInTheLoopEnv logic must match
         assert i["takeover"] == self.takeover
 
         if self.config["use_discrete"]:
@@ -335,8 +316,11 @@ class FakeHumanEnv(HumanInTheLoopEnv):
 
         return o, r, d, i
 
+    # ------------------------------------------------------------------ #
+    # Takeover-cost bookkeeping (same pattern as before)
+    # ------------------------------------------------------------------ #
     def _get_step_return(self, actions, engine_info):
-        """Compared to original one, here we don't call expert_policy, but directly get self.last_takeover."""
+        """Use self.last_takeover / self.takeover instead of policy-based flag."""
         o, r, tm, tc, engine_info = super(HumanInTheLoopEnv, self)._get_step_return(actions, engine_info)
         self.last_obs = o
         d = tm or tc
@@ -357,7 +341,6 @@ class FakeHumanEnv(HumanInTheLoopEnv):
         self.total_takeover_count += 1 if self.takeover else 0
         engine_info["total_takeover_count"] = self.total_takeover_count
         engine_info["total_cost"] = self.total_cost
-        # engine_info["total_cost_so_far"] = self.total_cost
         return o, r, d, engine_info
 
     def _get_reset_return(self, reset_info):
@@ -371,9 +354,7 @@ if __name__ == "__main__":
     env = FakeHumanEnv(dict(free_level=0.95, use_render=False))
     env.reset()
     while True:
-        _, _, done, info = env.step([0, 1])
-        # done = tm or tc
-        # env.render(mode="topdown")
+        _, _, done, info = env.step([0.0, 1.0])
         if done:
             print(info)
             env.reset()
